@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Puzzle Kingdom - Pro Rotation</title>
+    <style>
+        :root { --gold: #D4AF37; --bg: #0a0a0a; --tile-bg: #1a1a1a; }
+        
+        body { 
+            font-family: 'Arial Black', sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            margin: 0 auto; 
+            max-width: 600px; 
+            overflow-x: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            user-select: none;
+            touch-action: manipulation;
+        }
+        
+        /* Home Screen */
+        #home-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #home-screen h1 {
+            color: var(--gold);
+            font-size: 3rem;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            text-shadow: 0 4px 10px rgba(212, 175, 55, 0.4);
+        }
+
+        /* Game Wrapper */
+        #game-wrapper {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #difficulty-banner { 
+            width: 100%; background: var(--gold); color: black; text-align: center; 
+            padding: 10px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; 
+            font-size: 1.2rem; box-sizing: border-box;
+        }
+
+        #hud { 
+            width: 100%; padding: 15px 10px; background: #111; border-bottom: 3px solid var(--gold); 
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; 
+            box-sizing: border-box; 
+        }
+        .stat { text-align: center; font-size: 0.75rem; color: #aaa; }
+        .stat-val { display: block; font-size: 1.1rem; color: var(--gold); font-weight: bold; margin-top: 3px; }
+        .stat-wide { grid-column: span 3; display: flex; justify-content: space-around; border-top: 1px solid #333; padding-top: 10px; margin-top: 5px; }
+
+        #game-container { 
+            width: 92%; margin-top: 20px; position: relative; 
+        }
+        
+        #grid { 
+            position: relative;
+            width: 100%;
+            background: #000; border: 4px solid var(--gold); 
+            box-shadow: 0 0 25px rgba(212, 175, 55, 0.3); 
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .tile { 
+            position: absolute;
+            background-color: var(--tile-bg); 
+            cursor: pointer; 
+            box-shadow: inset 0 0 0 1px #333;
+            transition: transform 0.15s ease-out, box-shadow 0.2s; 
+            box-sizing: border-box;
+            background-repeat: no-repeat;
+        }
+        .tile.empty { background: #000 !important; cursor: default; box-shadow: none; z-index: -1; }
+
+        .controls { width: 92%; margin: 20px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { background: var(--gold); color: black; border: none; padding: 14px 5px; font-weight: 900; cursor: pointer; border-radius: 4px; text-transform: uppercase; transition: 0.1s; font-size: 0.85rem; }
+        .btn:active { transform: scale(0.96); }
+        .btn-blue { background: #2980b9; color: white; }
+        .btn-red { background: #c0392b; color: white; }
+        .btn-green { background: #27ae60; color: white; }
+        .btn-full { grid-column: span 2; } /* Useful for wide buttons */
+
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 4px solid var(--gold); padding: 25px; z-index: 1100; text-align: center; width: 85%; max-width: 320px; display: none; border-radius: 8px; box-sizing: border-box; }
+        .modal.active { display: block; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1050; display: none; }
+        .overlay.active { display: block; }
+    </style>
+</head>
+<body>
+
+<div id="home-screen">
+    <h1>PUZZLE<br>KINGDOM</h1>
+    <p style="color: #666; letter-spacing: 3px;">PRO ROTATION</p>
+    <button class="btn btn-green" style="padding: 20px 50px; font-size: 1.2rem; margin-top: 20px;" onclick="startGame()">START GAME</button>
+</div>
+
+<div id="game-wrapper">
+    <div id="difficulty-banner">MODE: <span id="diff-label">EASY</span></div>
+
+    <div id="hud">
+        <div class="stat">LEVEL<span class="stat-val" id="lvl-txt">1/50</span></div>
+        <div class="stat">STAGE<span class="stat-val" id="stg-txt">1/1</span></div>
+        <div class="stat">MOVES<span class="stat-val" id="move-txt">0</span></div>
+        <div class="stat-wide">
+            <div class="stat">TIME REMAINING<span class="stat-val" id="time-txt">--:--</span></div>
+            <div class="stat">BLOCK MOVERS<span class="stat-val" id="boost-txt">0</span></div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="grid"></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-green btn-full" onclick="toggleBooster()" id="boost-btn">USE BLOCK MOVER</button>
+        <button class="btn btn-full" onclick="openShop()">REDEEM CODES</button>
+    </div>
+</div>
+
+<div id="overlay" class="overlay"></div>
+<div id="shop-modal" class="modal">
+    <h2 style="color:var(--gold); margin-top:0;">REDEEM STATION</h2>
+    <p>Current Movers: <span id="shop-boost-count" style="color:var(--gold)">0</span></p>
+    
+    <div style="border-top: 1px solid #444; padding-top: 15px;">
+        <input type="text" id="redeem-input" placeholder="ENTER CODE" style="padding: 12px; width: 100%; border: none; margin-bottom: 10px; text-align: center; font-weight: bold; box-sizing: border-box; background: #333; color: white;">
+        <button class="btn btn-blue" style="width: 100%;" onclick="redeemCode()">REDEEM</button>
+    </div>
+    
+    <button class="btn btn-red" onclick="closeShop()" style="margin-top: 20px; width: 100%;">BACK</button>
+</div>
+
+<script>
+    const IMAGES = [
+        "https://i.ibb.co/kVCmzRYn/IMG-4833.jpg", "https://i.ibb.co/q3jXFb9q/IMG-1962-Original.jpg", "https://i.ibb.co/jPvF5kJY/IMG-1961-Original.jpg", "https://i.ibb.co/JWKkCsT1/IMG-1960-Original.jpg", "https://i.ibb.co/W1JCY3L/IMG-1964-Original.jpg", "https://i.ibb.co/JWSk46cs/IMG-4828.jpg", "https://i.ibb.co/tpBZyWhL/IMG-20220622-143041-Original.jpg", "https://i.ibb.co/V0H1GdnX/IMG-0154-Original.jpg", "https://i.ibb.co/tTFw0xMD/e7bb3e9f-6840-4fd9-be8e-bfa8143b7d97-Original.jpg", "https://i.ibb.co/SDwrXVdC/IMG-4824.jpg", "https://i.ibb.co/tTFD7zdk/IMG-4823.jpg", "https://i.ibb.co/XxjPPbdk/IMG-2305-Original.jpg", "https://i.ibb.co/hJDCsrk9/IMG-4652.jpg", "https://i.ibb.co/PLZ2tdN/IMG-2268-Original.jpg", "https://i.ibb.co/XfdQ9MtX/IMG-4619.jpg", "https://i.ibb.co/tPFgJm8J/IMG-4769.jpg", "https://i.ibb.co/wh7HwQcr/E6-AFB750-A394-4660-B843-1449-E2799186.png", "https://i.ibb.co/q3Mj2jdx/IMG-4555.jpg", "https://i.ibb.co/nsdW84zy/IMG-4761.jpg", "https://i.ibb.co/CssYkFBT/IMG-3340.jpg", "https://i.ibb.co/0jhXpsPg/IMG-2314-Original.jpg", "https://i.ibb.co/1fv5WQZy/IMG-4770.jpg", "https://i.ibb.co/tTwxkk1R/IMG-2308-Original.jpg", "https://i.ibb.co/7N2Np1y7/IMG-2311-Original.jpg", "https://i.ibb.co/gLyPDFfr/39-B8070-B-044-E-4-AB1-BBC9-72-F6-DE4-CC068-D88617-EB-92-F7-4-BE1-9-C15-7-B9-E4-DF4-FA0-D.jpg", "https://i.ibb.co/HDLT5hNf/412-B9786-3933-4-BE8-A44-E-2-B270-BA49-FDD.png", "https://i.ibb.co/VYV9jhfz/IMG-2301-Original.jpg", "https://i.ibb.co/XfxsJZHC/IMG-4538.jpg", "https://i.ibb.co/mCgZ90ZW/IMG-4776.jpg", "https://i.ibb.co/qL8x1GZS/IMG-4679.jpg", "https://i.ibb.co/bjkJgB4T/IMG-2272-Original.jpg", "https://i.ibb.co/Q3GTx1wf/IMG-4577.jpg", "https://i.ibb.co/KtK326r/IMG-2299-Original.jpg", "https://i.ibb.co/FbBTjqcf/IMG-4780.jpg", "https://i.ibb.co/DDgz8jpw/0694-AFDB-B274-4809-91-B2-092888444867.png", "https://i.ibb.co/6R7WJL5L/IMG-2270-Original.jpg", "https://i.ibb.co/JwqQpqxJ/IMG-4771.png", "https://i.ibb.co/Mmdyb7P/IMG-4773.jpg", "https://i.ibb.co/232XbQwC/IMG-2279-Original.jpg", "https://i.ibb.co/tTJwhR0g/IMG-4772.jpg", "https://i.ibb.co/3yXtvZhn/IMG-4767.jpg", "https://i.ibb.co/jZB335YM/IMG-2303-Original.jpg", "https://i.ibb.co/0Vn2RsG0/IMG-4765.jpg", "https://i.ibb.co/gZ4KVpGz/IMG-2274-Original.jpg", "https://i.ibb.co/Xr0TJCff/IMG-2280-Original.jpg", "https://i.ibb.co/7t3YqbZg/IMG-4775.jpg", "https://i.ibb.co/nq1Zp4GS/IMG-2302-Original.jpg", "https://i.ibb.co/Z5r1Cqz/IMG-2298-Original.jpg", "https://i.ibb.co/yBg4891k/IMG-2313-Original.jpg", "https://i.ibb.co/DPFNN2qG/IMG-4766.jpg"
+    ];
+
+    let gameState = {
+        level: 1, stage: 1, moves: 0, time: 0,
+        movers: 5, boosterActive: false,
+        size: 5, totalStages: 1, 
+        moveLimit: Infinity, timeLimit: Infinity,
+        timerInterval: null
+    };
+
+    let tiles = [];
+    let moverFirstIdx = null;
+
+    function startGame() {
+        document.getElementById('home-screen').style.display = 'none';
+        document.getElementById('game-wrapper').style.display = 'flex';
+        initLevel();
+    }
+
+    function initLevel() {
+        clearInterval(gameState.timerInterval);
+        gameState.moves = 0;
+        gameState.boosterActive = false;
+        moverFirstIdx = null;
+        
+        document.getElementById('boost-btn').classList.remove('btn-red');
+        document.getElementById('boost-btn').innerText = "USE BLOCK MOVER";
+        
+        let rotationPos = (gameState.level - 1) % 5;
+        switch(rotationPos) {
+            case 0: setupDiff("EASY", 4, 1, Infinity, Infinity); break;
+            case 1: setupDiff("MEDIUM", 5, 1, 250, 30 * 60); break;
+            case 2: setupDiff("HARD", 5, 2, Infinity, 40 * 60); break;
+            case 3: setupDiff("SUPER HARD", 5, 2, 380, 40 * 60); break;
+            case 4: setupDiff("NIGHTMARE", 6, 3, 560, 60 * 60); break;
+        }
+
+        gameState.time = gameState.timeLimit;
+        
+        const imgUrl = IMAGES[(gameState.level - 1) % IMAGES.length];
+        const img = new Image();
+        img.onload = () => {
+            const ratio = img.naturalWidth / img.naturalHeight;
+            document.getElementById('grid').style.aspectRatio = ratio;
+            createGrid(imgUrl);
+        };
+        img.src = imgUrl;
+
+        if (gameState.timeLimit !== Infinity) startTimer();
+        updateUI();
+    }
+
+    function setupDiff(label, size, stages, moves, time) {
+        document.getElementById('diff-label').innerText = label;
+        gameState.size = size;
+        gameState.totalStages = stages;
+        gameState.moveLimit = moves;
+        gameState.timeLimit = time;
+    }
+
+    function createGrid(imgUrl) {
+        const total = gameState.size * gameState.size;
+        let solved = false;
+
+        while(!solved) {
+            tiles = Array.from({length: total}, (_, i) => i);
+            for (let i = total - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+            }
+
+            let inv = 0;
+            for (let i = 0; i < total; i++) {
+                if (tiles[i] === total - 1) continue;
+                for (let j = i + 1; j < total; j++) {
+                    if (tiles[j] === total - 1) continue;
+                    if (tiles[i] > tiles[j]) inv++;
+                }
+            }
+
+            let isSolvable = false;
+            if (gameState.size % 2 !== 0) {
+                isSolvable = (inv % 2 === 0);
+            } else {
+                let pos = gameState.size - Math.floor(tiles.indexOf(total - 1) / gameState.size);
+                isSolvable = (pos % 2 === 0) ? (inv % 2 !== 0) : (inv % 2 === 0);
+            }
+
+            let home = tiles.reduce((acc, val, idx) => acc + (val === idx ? 1 : 0), 0);
+            if (isSolvable && home <= 1) solved = true;
+        }
+        renderDOM(imgUrl);
+    }
+
+    function renderDOM(imgUrl) {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        const step = 100 / gameState.size;
+
+        for(let val = 0; val < tiles.length; val++) {
+            const div = document.createElement('div');
+            div.id = 'tile-' + val;
+            div.className = 'tile';
+            div.style.width = step + '%';
+            div.style.height = step + '%';
+
+            if (val === tiles.length - 1) {
+                div.classList.add('empty');
+            } else {
+                div.style.backgroundImage = `url(${imgUrl})`;
+                div.style.backgroundSize = (gameState.size * 100) + '% ' + (gameState.size * 100) + '%';
+                const r = Math.floor(val / gameState.size);
+                const c = val % gameState.size;
+                div.style.backgroundPosition = `${(c/(gameState.size-1))*100}% ${(r/(gameState.size-1))*100}%`;
+                div.onclick = () => handleTileClick(tiles.indexOf(val));
+            }
+            grid.appendChild(div);
+        }
+        updatePositions();
+    }
+
+    function updatePositions() {
+        tiles.forEach((val, idx) => {
+            const div = document.getElementById('tile-' + val);
+            div.style.transform = `translate(${(idx % gameState.size) * 100}%, ${Math.floor(idx / gameState.size) * 100}%)`;
+        });
+    }
+
+    function handleTileClick(idx) {
+        const emptyIdx = tiles.indexOf(tiles.length - 1);
+        
+        if (gameState.boosterActive) {
+            if (moverFirstIdx === null) {
+                moverFirstIdx = idx;
+                document.getElementById('tile-' + tiles[idx]).style.boxShadow = 'inset 0 0 0 5px #27ae60';
+                document.getElementById('boost-btn').innerText = "SELECT TARGET";
+            } else {
+                swap(moverFirstIdx, idx);
+                gameState.movers--;
+                gameState.boosterActive = false;
+                moverFirstIdx = null;
+                document.getElementById('boost-btn').classList.remove('btn-red');
+                document.getElementById('boost-btn').innerText = "USE BLOCK MOVER";
+                document.querySelectorAll('.tile').forEach(t => t.style.boxShadow = 'inset 0 0 0 1px #333');
+                checkWin();
+                updateUI();
+            }
+            return;
+        }
+
+        if (isAdjacent(idx, emptyIdx)) {
+            swap(idx, emptyIdx);
+            gameState.moves++;
+            checkWin();
+            updateUI();
+        }
+    }
+
+    function isAdjacent(i1, i2) {
+        const r1 = Math.floor(i1/gameState.size), c1 = i1%gameState.size;
+        const r2 = Math.floor(i2/gameState.size), c2 = i2%gameState.size;
+        return (Math.abs(r1-r2) + Math.abs(c1-c2)) === 1;
+    }
+
+    function swap(i, j) {
+        [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+        updatePositions();
+    }
+
+    function checkWin() {
+        if (tiles.every((v, i) => v === i)) {
+            setTimeout(() => {
+                if (gameState.stage < gameState.totalStages) {
+                    alert("Stage Clear!");
+                    gameState.stage++;
+                    initLevel();
+                } else {
+                    alert("Level Victory!");
+                    gameState.level++;
+                    gameState.stage = 1;
+                    initLevel();
+                }
+            }, 200);
+        }
+        if (gameState.moves > gameState.moveLimit) {
+            setTimeout(() => { alert("Limit Reached!"); initLevel(); }, 100);
+        }
+    }
+
+    function startTimer() {
+        gameState.timerInterval = setInterval(() => {
+            gameState.time--;
+            updateUI();
+            if (gameState.time <= 0) {
+                clearInterval(gameState.timerInterval);
+                alert("Time Up!");
+                initLevel();
+            }
+        }, 1000);
+    }
+
+    function updateUI() {
+        document.getElementById('lvl-txt').innerText = `${gameState.level}/50`;
+        document.getElementById('stg-txt').innerText = `${gameState.stage}/${gameState.totalStages}`;
+        document.getElementById('move-txt').innerText = gameState.moveLimit === Infinity ? gameState.moves : `${gameState.moves}/${gameState.moveLimit}`;
+        document.getElementById('boost-txt').innerText = gameState.movers;
+        document.getElementById('shop-boost-count').innerText = gameState.movers;
+        if (gameState.timeLimit === Infinity) {
+            document.getElementById('time-txt').innerText = "NO LIMIT";
+        } else {
+            const m = Math.floor(gameState.time/60), s = gameState.time%60;
+            document.getElementById('time-txt').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+    }
+
+    function toggleBooster() {
+        if (gameState.movers <= 0) return alert("No movers left! Redeem a code.");
+        gameState.boosterActive = !gameState.boosterActive;
+        moverFirstIdx = null;
+        document.querySelectorAll('.tile').forEach(t => t.style.boxShadow = 'inset 0 0 0 1px #333');
+        const btn = document.getElementById('boost-btn');
+        btn.classList.toggle('btn-red', gameState.boosterActive);
+        btn.innerText = gameState.boosterActive ? "SELECT FIRST TILE" : "USE BLOCK MOVER";
+    }
+
+    function openShop() { document.getElementById('shop-modal').classList.add('active'); document.getElementById('overlay').classList.add('active'); }
+    function closeShop() { document.getElementById('shop-modal').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+    
+    function redeemCode() {
+        const code = document.getElementById('redeem-input').value.toUpperCase();
+        if(code === "NANI") {
+            gameState.movers += 10; alert("+10 Movers added!");
+        } else {
+            alert("Invalid Code");
+        }
+        document.getElementById('redeem-input').value = "";
+        updateUI();
+    }
+</script>
+</body>
+</html>
